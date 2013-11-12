@@ -60,3 +60,22 @@ let play ?(dest=localhost) uri =
     )
   with Unix.Unix_error _ ->
     return (Error "server not reachable")
+
+let queue ?(dest=localhost) uri =
+  try_lwt
+    Tcp_client.with_connection dest (fun (ic, oc) ->
+      let query = mk_query "queue" (`String uri) in
+      lwt () = Lwt_io.write_line oc query in
+      lwt str = Lwt_io.read_line ic in
+      let json = J.from_string str in
+      match J.Util.(index 0 json |> to_string) with
+      | "ok" ->
+	return (Ok ())
+      | "error" ->
+	let err = J.Util.(index 1 json |> to_string) in
+	return (Error err)
+      | msg ->
+	return (Error (sprintf "unknown answer kind '%s'" msg))
+    )
+  with Unix.Unix_error _ ->
+    return (Error "server not reachable")
