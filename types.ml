@@ -48,9 +48,12 @@ end
 module SearchResult = struct
   type t = {
     source  : string ;
-    artists : Artist.t list * bool ;
-    albums  : Album.t list * bool ;
-    tracks  : Track.t list * bool ;
+    artists : Artist.t list ;
+    mutable folded_art : bool ;
+    albums  : Album.t list ;
+    mutable folded_alb : bool ;
+    tracks  : Track.t list ;
+    mutable folded_tra : bool ;
   }
 
   let from_json j =
@@ -60,14 +63,13 @@ module SearchResult = struct
       | src :: _ -> src
       | _ -> assert false
     in
-    let artists =
-      J.Util.(member "artists" j |> convert_each' Artist.from_json), false
-    in
-    let albums =
-      J.Util.(member "albums" j |> convert_each' Album.from_json), false
-    in
-    let tracks =
-      J.Util.(member "tracks" j |> convert_each' Track.from_json), false
-    in
-    { source ; artists ; albums ; tracks }
+    let artists = J.Util.(member "artists" j |> convert_each' Artist.from_json) in
+    let albums = J.Util.(member "albums" j |> convert_each' Album.from_json) in
+    let tracks = J.Util.(member "tracks" j |> convert_each' Track.from_json) in
+    { 
+      source ; artists ; albums ; tracks ;
+      folded_art = true ;
+      folded_alb = true ;
+      folded_tra = true ;
+    }
 end

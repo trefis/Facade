@@ -78,35 +78,36 @@ let draw_results ctx (lst, request, line) =
   LTerm_draw.draw_string_aligned ctx !top LTerm_geom.H_align_center
     ~style:LTerm_style.({ none with bold = Some true })
     (sprintf "Results for '%s':" request) ;
-  let item = function true -> '-' | false -> '+' in
+  let item = function true -> '+' | false -> '-' in
   top := 5 ;
   let open Types in
   ignore begin
     List.fold lst ~init:0 ~f:(fun line result  ->
       incr top ;
+      let open SearchResult in
       LTerm_draw.draw_string ctx (!top + line) 2 
-        (sprintf "Source : %s" result.SearchResult.source) ;
+        (sprintf "Source : %s" result.source) ;
       incr top ;
-      let l, opened = result.SearchResult.artists in
-      print line (sprintf "%c %d artists" (item opened) (List.length l)) ;
+      let l = result.artists in
+      print line (sprintf "%c %d artists" (item result.folded_art) (List.length l)) ;
       let line =
-        if not opened then line + 1 else
+        if result.folded_art then line + 1 else
         List.fold l ~init:(line + 1) ~f:(fun l artist ->
           print l (sprintf "    %s" artist.Artist.name) ; l + 1
         )
       in
-      let l, opened = result.SearchResult.albums in
-      print line (sprintf "%c %d albums" (item opened) (List.length l)) ;
+      let l = result.albums in
+      print line (sprintf "%c %d albums" (item result.folded_alb) (List.length l)) ;
       let line =
-        if not opened then line + 1 else
+        if result.folded_alb then line + 1 else
         List.fold l ~init:(line + 1) ~f:(fun l album ->
           print l (sprintf "    %s" album.Album.name) ; l + 1
         )
       in
-      let l, opened = result.SearchResult.tracks in
-      print line (sprintf "%c %d tracks" (item opened) (List.length l)) ;
+      let l = result.tracks in
+      print line (sprintf "%c %d tracks" (item result.folded_tra) (List.length l)) ;
       let line =
-        if not opened then line + 1 else
+        if result.folded_tra then line + 1 else
         List.fold l ~init:(line + 1) ~f:(fun l track ->
           print l (sprintf "    %s" track.Track.name) ; l + 1
         )
@@ -146,7 +147,7 @@ let handle env err_opt ~key =
           let str = get_string str in
           lwt res = Network.search str in
           let res = Result.map res ~f:(fun x -> SearchResult (x, str, 0)) in
-          raise (Transition res)
+          raise_lwt (Transition res)
         | Backspace  -> return (Zipper.delete str `before)
         | Delete     -> return (Zipper.delete str `after)
         | Left       -> return (Zipper.backward str)
@@ -158,56 +159,77 @@ let handle env err_opt ~key =
         env := Zipper.set_current !env (Main str') ;
       return_unit
     | SearchResult (lst, request, line) ->
-      lwt lst, line =
-        match LTerm_key.code key with
-        | Up -> return (lst, line - 1)
-        | Down -> return (lst, line + 1)
-        | Enter ->
-          let toggled = ref false in
-          let open Types in
-          lwt _, lst =
-            let fold_result (l, acc) result =
-              let l, artists =
-                let lst, opened = result.SearchResult.artists in
-                if !toggled then l, (lst, opened) else
-                if l = line then (toggled := true ; l, (lst, not opened)) else
-                if not opened then l + 1, (lst, opened) else
-                List.fold lst ~init:(l + 1) ~f:(fun l _artist -> l + 1), (lst, opened)
-              in
-              let l, albums =
-                let lst, opened = result.SearchResult.albums in
-                if !toggled then l, (lst, opened) else
-                if l = line then (toggled := true ; l, (lst, not opened)) else
-                if not opened then l + 1, (lst, opened) else
-                List.fold lst ~init:(l + 1) ~f:(fun l _album -> l + 1), (lst, opened)
-              in
-              lwt l, tracks =
-                let lst, opened = result.SearchResult.tracks in
-                if !toggled then return (l, (lst, opened)) else
-                if l = line then (toggled := true ; return (l, (lst, not opened))) else
-                if not opened then return (l + 1, (lst, opened)) else
-                let track_fun l track =
-                  if l <> line then return (l + 1) else
-                  lwt msg =
-                    Network.play track.Track.uri
-                    >>= function
-                    | Ok () -> return (sprintf "Playing '%s'" track.Track.name)
-                    | Error msg -> return msg
-                  in
-                  raise (Transition (Error msg))
-                in
-                lwt l = Lwt_list.fold_left_s track_fun (l + 1) lst in
-                return (l, (lst, opened))
-              in
-              return (l, { result with SearchResult. artists ; albums ; tracks } :: acc)
+      begin match LTerm_key.code key with
+      | Up ->
+        env := Zipper.set_current !env (SearchResult (lst, request, line - 1)) ;
+        return ()
+      | Down ->
+        env := Zipper.set_current !env (SearchResult (lst, request, line + 1)) ;
+        return ()
+      | Enter ->
+        let toggled = ref false in
+        let open Types in
+        lwt _ =
+          let fold_result l result =
+            let open SearchResult in
+            let l =
+              let lst = result.artists in
+              if !toggled then
+                l
+              else if l = line then (
+                toggled := true ;
+                result.folded_art <- not result.folded_art ;
+                l
+              ) else if result.folded_art then
+                l + 1
+              else
+                List.fold lst ~init:(l + 1) ~f:(fun l _artist -> l + 1)
             in
-            Lwt_list.fold_left_s fold_result (0, []) lst
+            let l =
+              let lst = result.albums in
+              if !toggled then
+                l
+              else if l = line then (
+                toggled := true ;
+                result.folded_alb <- not result.folded_alb ;
+                l
+              ) else if result.folded_alb then
+                l + 1
+              else
+                List.fold lst ~init:(l + 1) ~f:(fun l _album -> l + 1)
+            in
+            lwt l =
+              let track_fun l track =
+                if l <> line then return (l + 1) else
+                lwt msg =
+                  Network.play track.Track.uri
+                  >>= function
+                  | Ok () -> return (sprintf "Playing '%s'" track.Track.name)
+                  | Error msg -> return msg
+                in
+                env := Zipper.set_current !env (SearchResult (lst, request, line + 1)) ;
+                raise_lwt (Transition (Error msg))
+              in
+              let lst = result.tracks in
+              if !toggled then
+                return l
+              else
+              if l = line then (
+                toggled := true ;
+                result.folded_tra <- not result.folded_tra ;
+                return l
+              ) else if result.folded_tra then
+                return (l + 1)
+              else
+                Lwt_list.fold_left_s track_fun (l + 1) lst
+            in
+            return l
           in
-          return (List.rev lst, line)
-        | _ -> return (lst, line)
-      in
-      env := Zipper.set_current !env (SearchResult (lst, request, line)) ;
-      return_unit
+          Lwt_list.fold_left_s fold_result 0 lst
+        in
+        return ()
+      | _ -> return ()
+      end
     | _ -> return_unit
     end
   with
