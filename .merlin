@@ -1,0 +1,7 @@
+B _build
+
+PKG core lwt
+PKG camomile lambda-term
+PKG yojson
+
+EXT lwt

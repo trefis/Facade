@@ -1,0 +1,6 @@
+true: bin_annot, debug, thread, syntax(camlp4o)
+
+true: package(core)
+true: package(lwt), package(lwt.unix), package(lwt.syntax)
+true: package(camomile), package(lambda-term)
+true: package(yojson)
