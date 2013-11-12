@@ -73,3 +73,9 @@ module SearchResult = struct
       folded_tra = true ;
     }
 end
+
+type view =
+  | Main of CamomileLibrary.UChar.t Zipper.t
+  | SearchResult of SearchResult.t list * string * int
+
+exception Transition of (view, string) Result.t
