@@ -34,15 +34,15 @@ module Track = struct
     uri     : string ;
     name    : string ;
     artists : Artist.t list ;
-    albums  : Album.t list ;
+    album  : Album.t ;
   }
 
   let from_json j =
     let uri = J.Util.(member "uri" j |> to_string') in
     let name = J.Util.(member "name" j |> to_string) in
     let artists = J.Util.(member "artists" j |> convert_each' Artist.from_json) in
-    let albums = J.Util.(member "albums" j |> convert_each' Album.from_json) in
-    { uri ; name ; artists ; albums }
+    let album = Album.from_json J.Util.(member "album" j) in
+    { uri ; name ; artists ; album }
 end
 
 module SearchResult = struct
@@ -82,9 +82,17 @@ module View = struct
     mutable screen_portion : int * int ;
   }
 
+  type album_view_state = {
+    name  : string ;
+    uri   : string ;
+    songs : Track.t list ;
+    mutable curr_line : int ;
+  }
+
   type t =
     | Main of CamomileLibrary.UChar.t Zipper.t
     | SR of sr_state
+    | Album of album_view_state
 end
 
 exception Transition of (View.t, string) Result.t

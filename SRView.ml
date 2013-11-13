@@ -57,14 +57,17 @@ let draw ctx state =
       let line =
         if result.folded_tra then line + 1 else
         List.fold l ~init:(line + 1) ~f:(fun l track ->
-          let authors =
+          let infos =
             let l = List.map track.Track.artists ~f:(fun a -> a.Artist.name) in
-            let str = String.concat ~sep:", " l in
-            if String.length str <= 30 then str else
-              sprintf "%s..." (String.prefix str 27)
+            let str =
+              sprintf "(%s) %s" track.Track.album.Album.name
+                (String.concat ~sep:", " l)
+            in
+            if String.length str <= 50 then str else
+              sprintf "%s..." (String.prefix str 47)
           in
           print l (sprintf "    %s" track.Track.name) ;
-          print l ~align (sprintf "%s  " authors) ;
+          print l ~align (sprintf "%s    " infos) ;
           l + 1
         )
       in
@@ -125,18 +128,31 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
           else
             List.fold lst ~init:(l + 1) ~f:(fun l _artist -> l + 1)
         in
-        let l =
+        lwt l =
+          let album_fun l album =
+            if l <> line then return (l + 1) else
+            let name = album.Album.name in
+            let uri = album.Album.uri in
+            lwt trans =
+              Network.get_album uri name
+              >|= function
+              | Error msg -> Error msg
+              | Ok songs ->
+                Ok View.(Album { name ; uri ; songs ; curr_line = 0 })
+            in
+            raise_lwt (Transition trans)
+          in
           let lst = result.albums in
           if !toggled then
-            l
+            return l
           else if l = line then (
             toggled := true ;
             result.folded_alb <- not result.folded_alb ;
-            l
+            return l
           ) else if result.folded_alb then
-            l + 1
+            return (l + 1)
           else
-            List.fold lst ~init:(l + 1) ~f:(fun l _album -> l + 1)
+            Lwt_list.fold_left_s album_fun (l + 1) lst
         in
         lwt l =
           let track_fun l track =
