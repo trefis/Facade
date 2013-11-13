@@ -79,3 +79,10 @@ type view =
   | SearchResult of SearchResult.t list * string * int
 
 exception Transition of (view, string) Result.t
+
+module Env = struct
+  type t = view Zipper.t ref
+
+  let init = Zipper.singleton (Main Zipper.empty)
+end
+

@@ -3,12 +3,6 @@ open Lwt
 open CamomileLibrary
 open Types
 
-module Env = struct
-  type t = view Zipper.t
-
-  let init = Zipper.singleton (Main Zipper.empty)
-end
-
 let hist_string =
   Zipper.fold ~init:"" ~f:(fun is_current acc elt ->
     let separator = if is_current then "»»" else "»" in
@@ -50,7 +44,6 @@ let handle env err_opt ~key =
     begin match Zipper.current !env with
     | Main str -> Main.handle env ~key str
     | SearchResult (lst, req, line) -> SRView.handle env ~key lst req line
-    | _ -> return ()
     end
   with
   | Transition (Ok view) ->
@@ -69,14 +62,25 @@ let rec loop ui env err_opt =
   | LTerm_event.Key key ->
     lwt () =
       match key.code with
-      | F2 -> env := Zipper.backward !env ; return_unit
-      | F3 -> env := Zipper.forward !env ; return_unit
+      | Left when key.control  -> env := Zipper.backward !env ; return_unit
+      | Right when key.control -> env := Zipper.forward !env ; return_unit
+
+      | Char c when key.control && UChar.char_of c = 'h' ->
+        env := Zipper.backward !env ; return_unit
+      | Char c when key.control && UChar.char_of c = 'l' ->
+        env := Zipper.forward !env ; return_unit
+
       | _ -> handle ~key env err_opt
     in
     LTerm_ui.draw ui ;
     loop ui env err_opt
 
   | _ -> loop ui env err_opt
+
+let rec refresher ui =
+  lwt () = Lwt_unix.sleep 1. in
+  LTerm_ui.draw ui ;
+  refresher ui
   
 let _lwt_unit =
   let initial_env = ref Env.init in
@@ -84,6 +88,7 @@ let _lwt_unit =
   lwt term = Lazy.force LTerm.stdout in
   lwt ui   = LTerm_ui.create term (draw_fun (initial_env, initial_err)) in
   try_lwt
+    ignore_result (refresher ui) ;
     loop ui initial_env initial_err
   finally
     LTerm_ui.quit ui

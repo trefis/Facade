@@ -3,7 +3,6 @@ open Lwt
 open Types
 
 let draw ctx lst request line =
-  let { LTerm_geom. rows = r ; cols = c } = LTerm_draw.size ctx in
   let top = ref 2 in (* no questions please. *)
   let print row str =
     let style =
@@ -53,16 +52,24 @@ let draw ctx lst request line =
     )
   end
 
+let to_handled_keys = function
+  | LTerm_key.Up -> `Up
+  | LTerm_key.Down -> `Down
+  | LTerm_key.Enter -> `Enter
+  | LTerm_key.Char uchar when CamomileLibrary.UChar.char_of uchar = ' ' ->
+    `Space
+  | _ -> `NotHandled
+
 let handle env ~key lst request line =
-  let open LTerm_key in
-  begin match LTerm_key.code key with
-  | Up ->
+  let key = to_handled_keys (LTerm_key.code key) in
+  match key with
+  | `Up ->
     env := Zipper.set_current !env (SearchResult (lst, request, line - 1)) ;
     return ()
-  | Down ->
+  | `Down ->
     env := Zipper.set_current !env (SearchResult (lst, request, line + 1)) ;
     return ()
-  | Enter ->
+  | `Enter | `Space ->
     let toggled = ref false in
     let open Types in
     lwt _ =
@@ -97,13 +104,22 @@ let handle env ~key lst request line =
         lwt l =
           let track_fun l track =
             if l <> line then return (l + 1) else
-            lwt msg =
-              Network.play track.Track.uri
-              >>= function
-              | Ok () -> return (sprintf "Playing '%s'" track.Track.name)
-              | Error msg -> return msg
+            let result, msg =
+              match key with
+              | `Enter ->
+                Network.play track.Track.uri,
+                sprintf "Playing '%s'" track.Track.name
+              | (* `Space *) _ ->
+                Network.queue track.Track.uri,
+                sprintf "Added '%s' to playlist" track.Track.name
             in
             env := Zipper.set_current !env (SearchResult (lst, request, line + 1)) ;
+            lwt msg =
+              result
+              >|= function
+              | Ok () -> msg
+              | Error msg -> msg
+            in
             raise_lwt (Transition (Error msg))
           in
           let lst = result.tracks in
@@ -125,4 +141,3 @@ let handle env ~key lst request line =
     in
     return ()
   | _ -> return ()
-  end
