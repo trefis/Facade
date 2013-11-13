@@ -2,23 +2,28 @@ open Core.Std
 open Lwt
 open Types
 
-let draw ctx { View. results = lst ; request ; cursor_line = line ; _ } =
-  let top = ref 2 in (* no questions please. *)
+let draw ctx state =
+  let line = state.View.cursor_line in
+  if state.View.screen_portion = (0,0) then (
+    let { LTerm_geom . rows ; cols } = LTerm_draw.size ctx in
+    state.View.screen_portion <- (0, rows - 4)
+  ) ;
+  let min_r, max_r = state.View.screen_portion in
   let print row ?(align = LTerm_geom.H_align_left) str =
+    if row < min_r || row > max_r then () else
     let style =
       if row <> line then None else
       Some LTerm_style.({ none with foreground = Some lblue; bold = Some true })
     in
-    LTerm_draw.draw_string_aligned ctx (!top + row) align ?style str
+    LTerm_draw.draw_string_aligned ctx (3 + row - min_r) align ?style str
   in
-  LTerm_draw.draw_string_aligned ctx !top LTerm_geom.H_align_center
+  LTerm_draw.draw_string_aligned ctx 1 LTerm_geom.H_align_center
     ~style:LTerm_style.({ none with bold = Some true })
-    (sprintf "Results for '%s':" request) ;
+    (sprintf "Results for '%s':" state.View.request) ;
   let item = function true -> '+' | false -> '-' in
-  top := 5 ;
   let open Types in
   ignore begin
-    List.fold lst ~init:0 ~f:(fun line result  ->
+    List.fold state.View.results ~init:0 ~f:(fun line result  ->
       let open SearchResult in
       let align = LTerm_geom.H_align_right in
       print line (sprintf " Source : %s" result.source) ;
@@ -52,7 +57,15 @@ let draw ctx { View. results = lst ; request ; cursor_line = line ; _ } =
       let line =
         if result.folded_tra then line + 1 else
         List.fold l ~init:(line + 1) ~f:(fun l track ->
-          print l (sprintf "    %s" track.Track.name) ; l + 1
+          let authors =
+            let l = List.map track.Track.artists ~f:(fun a -> a.Artist.name) in
+            let str = String.concat ~sep:", " l in
+            if String.length str <= 30 then str else
+              sprintf "%s..." (String.prefix str 27)
+          in
+          print l (sprintf "    %s" track.Track.name) ;
+          print l ~align (sprintf "%s  " authors) ;
+          l + 1
         )
       in
       line + 1
@@ -78,14 +91,19 @@ let nb_lines =
 
 let handle env ~key ({ View. cursor_line = line ; _ } as state) =
   let key = to_handled_keys (LTerm_key.code key) in
+  let (min_r, max_r) = state.View.screen_portion in
   match key with
   | `Up ->
     let line = max 0 (line - 1) in
     state.View.cursor_line <- line ;
+    if min_r > line then
+      state.View.screen_portion <- (min_r - 1, max_r - 1) ;
     return ()
   | `Down ->
     let line = min (nb_lines state.View.results) (line + 1) in
     state.View.cursor_line <- line ;
+    if max_r < line then
+      state.View.screen_portion <- (min_r + 1, max_r + 1) ;
     return ()
   | `Enter | `Space ->
     let toggled = ref false in
