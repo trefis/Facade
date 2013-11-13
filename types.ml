@@ -74,15 +74,24 @@ module SearchResult = struct
     }
 end
 
-type view =
-  | Main of CamomileLibrary.UChar.t Zipper.t
-  | SearchResult of SearchResult.t list * string * int
+module View = struct
+  type sr_state = {
+    request : string ;
+    results : SearchResult.t list ;
+    mutable cursor_line    : int ;
+    mutable screen_portion : int * int ;
+  }
 
-exception Transition of (view, string) Result.t
+  type t =
+    | Main of CamomileLibrary.UChar.t Zipper.t
+    | SR of sr_state
+end
+
+exception Transition of (View.t, string) Result.t
 
 module Env = struct
-  type t = view Zipper.t ref
+  type t = View.t Zipper.t ref
 
-  let init = Zipper.singleton (Main Zipper.empty)
+  let init = Zipper.singleton (View.Main Zipper.empty)
 end
 

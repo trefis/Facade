@@ -6,9 +6,10 @@ open Types
 let hist_string =
   Zipper.fold ~init:"" ~f:(fun is_current acc elt ->
     let separator = if is_current then "»»" else "»" in
+    let open View in
     match elt with
     | Main _ -> sprintf "%s %s search" acc separator
-    | SearchResult (_, request, _) -> sprintf "%s %s %s" acc separator request
+    | SR state -> sprintf "%s %s %s" acc separator state.request
   )
 
 let subcontext ctx ~between =
@@ -28,9 +29,10 @@ let draw_fun (env, err_opt) ui matrix =
   let status_ln = subcontext ctx ~between:(-3, -1) in
   LTerm_draw.draw_hline status_ln 0 0 (LTerm_geom.cols size - 1) LTerm_draw.Light ;
   LTerm_draw.draw_string_aligned status_ln 1 LTerm_geom.H_align_left (hist_string !env) ;
+  let open View in
   begin match Zipper.current !env with
   | Main str -> Main.draw main_view str
-  | SearchResult (s, r, l) -> SRView.draw main_view s r l
+  | SR state -> SRView.draw main_view state
   end ;
   match !err_opt with
   | None -> ()
@@ -42,8 +44,8 @@ let handle env err_opt ~key =
   let open LTerm_key in
   try_lwt
     begin match Zipper.current !env with
-    | Main str -> Main.handle env ~key str
-    | SearchResult (lst, req, line) -> SRView.handle env ~key lst req line
+    | View.Main str -> Main.handle env ~key str
+    | View.SR state -> SRView.handle env ~key state
     end
   with
   | Transition (Ok view) ->

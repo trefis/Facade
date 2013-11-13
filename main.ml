@@ -43,9 +43,12 @@ let handle env ~key str =
     let open LTerm_key in
     match LTerm_key.code key with
     | Enter ->
-      let str = get_string str in
-      lwt res = Network.search str in
-      let res = Result.map res ~f:(fun x -> SearchResult (x, str, 0)) in
+      let request = get_string str in
+      lwt res = Network.search request in
+      let f results =
+        View.(SR { request ; results ; cursor_line = 0 ; screen_portion = 0,0 })
+      in
+      let res = Result.map res ~f in
       raise_lwt (Transition res)
     | Backspace  -> return (Zipper.delete str `before)
     | Delete     -> return (Zipper.delete str `after)
@@ -55,5 +58,5 @@ let handle env ~key str =
     | _ -> return str
   in
   if not (phys_equal str str') then
-    env := Zipper.set_current !env (Main str') ;
+    env := Zipper.set_current !env (View.Main str') ;
   return_unit

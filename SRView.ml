@@ -2,14 +2,14 @@ open Core.Std
 open Lwt
 open Types
 
-let draw ctx lst request line =
+let draw ctx { View. results = lst ; request ; cursor_line = line ; _ } =
   let top = ref 2 in (* no questions please. *)
-  let print row str =
+  let print row ?(align = LTerm_geom.H_align_left) str =
     let style =
       if row <> line then None else
       Some LTerm_style.({ none with foreground = Some lblue; bold = Some true })
     in
-    LTerm_draw.draw_string ctx (!top + row) 5 ?style str
+    LTerm_draw.draw_string_aligned ctx (!top + row) align ?style str
   in
   LTerm_draw.draw_string_aligned ctx !top LTerm_geom.H_align_center
     ~style:LTerm_style.({ none with bold = Some true })
@@ -19,13 +19,12 @@ let draw ctx lst request line =
   let open Types in
   ignore begin
     List.fold lst ~init:0 ~f:(fun line result  ->
-      incr top ;
       let open SearchResult in
-      LTerm_draw.draw_string ctx (!top + line) 2 
-        (sprintf "Source : %s" result.source) ;
-      incr top ;
+      let align = LTerm_geom.H_align_right in
+      print line (sprintf " Source : %s" result.source) ;
+      let line = line + 1 in
       let l = result.artists in
-      print line (sprintf "%c %d artists" (item result.folded_art) (List.length l)) ;
+      print line (sprintf " %c %d artists" (item result.folded_art) (List.length l)) ;
       let line =
         if result.folded_art then line + 1 else
         List.fold l ~init:(line + 1) ~f:(fun l artist ->
@@ -33,22 +32,30 @@ let draw ctx lst request line =
         )
       in
       let l = result.albums in
-      print line (sprintf "%c %d albums" (item result.folded_alb) (List.length l)) ;
+      print line (sprintf " %c %d albums" (item result.folded_alb) (List.length l)) ;
       let line =
         if result.folded_alb then line + 1 else
         List.fold l ~init:(line + 1) ~f:(fun l album ->
-          print l (sprintf "    %s" album.Album.name) ; l + 1
+          let authors =
+            let l = List.map album.Album.artists ~f:(fun a -> a.Artist.name) in
+            let str = String.concat ~sep:", " l in
+            if String.length str <= 30 then str else
+              sprintf "%s..." (String.prefix str 27)
+          in
+          print l (sprintf "    %s" album.Album.name) ;
+          print l ~align (sprintf "%s  " authors) ;
+          l + 1
         )
       in
       let l = result.tracks in
-      print line (sprintf "%c %d tracks" (item result.folded_tra) (List.length l)) ;
+      print line (sprintf " %c %d tracks" (item result.folded_tra) (List.length l)) ;
       let line =
         if result.folded_tra then line + 1 else
         List.fold l ~init:(line + 1) ~f:(fun l track ->
           print l (sprintf "    %s" track.Track.name) ; l + 1
         )
       in
-      line
+      line + 1
     )
   end
 
@@ -60,14 +67,25 @@ let to_handled_keys = function
     `Space
   | _ -> `NotHandled
 
-let handle env ~key lst request line =
+let nb_lines =
+  List.fold ~init:0 ~f:(fun nb result ->
+    let open SearchResult in
+    let arts = if result.folded_art then 0 else List.length result.artists in
+    let albs = if result.folded_alb then 0 else List.length result.albums in
+    let tras = if result.folded_tra then 0 else List.length result.tracks in
+    nb + 4 + arts + albs + tras
+  )
+
+let handle env ~key ({ View. cursor_line = line ; _ } as state) =
   let key = to_handled_keys (LTerm_key.code key) in
   match key with
   | `Up ->
-    env := Zipper.set_current !env (SearchResult (lst, request, line - 1)) ;
+    let line = max 0 (line - 1) in
+    state.View.cursor_line <- line ;
     return ()
   | `Down ->
-    env := Zipper.set_current !env (SearchResult (lst, request, line + 1)) ;
+    let line = min (nb_lines state.View.results) (line + 1) in
+    state.View.cursor_line <- line ;
     return ()
   | `Enter | `Space ->
     let toggled = ref false in
@@ -75,6 +93,7 @@ let handle env ~key lst request line =
     lwt _ =
       let fold_result l result =
         let open SearchResult in
+        let l = l + 1 in
         let l =
           let lst = result.artists in
           if !toggled then
@@ -113,7 +132,7 @@ let handle env ~key lst request line =
                 Network.queue track.Track.uri,
                 sprintf "Added '%s' to playlist" track.Track.name
             in
-            env := Zipper.set_current !env (SearchResult (lst, request, line + 1)) ;
+            state.View.cursor_line <- line + 1 ;
             lwt msg =
               result
               >|= function
@@ -135,9 +154,9 @@ let handle env ~key lst request line =
           else
             Lwt_list.fold_left_s track_fun (l + 1) lst
         in
-        return l
+        return (l + 1)
       in
-      Lwt_list.fold_left_s fold_result 0 lst
+      Lwt_list.fold_left_s fold_result 0 state.View.results
     in
     return ()
   | _ -> return ()
