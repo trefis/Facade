@@ -22,26 +22,24 @@ let draw ctx state =
     (sprintf "Results for '%s':" state.View.request) ;
   let item = function true -> '+' | false -> '-' in
   let open Types in
+  let foobar fmt ~line ~f x =
+    let open Foldable in
+    print line (fmt (item x.folded) (List.length x.values)) ;
+    if x.folded then line + 1 else List.fold x.values ~init:(line + 1) ~f
+  in
   ignore begin
     List.fold state.View.results ~init:0 ~f:(fun line result  ->
       let open SearchResult in
-      let open Foldable in
       let align = LTerm_geom.H_align_right in
       print line (sprintf " Source : %s" result.source) ;
       let line = line + 1 in
-      let x = result.artists in
-      print line (sprintf " %c %d artists" (item x.folded) (List.length x.values)) ;
       let line =
-        if x.folded then line + 1 else
-        List.fold x.values ~init:(line + 1) ~f:(fun l artist ->
+        foobar ~line (sprintf " %c %d artists") result.artists ~f:(fun l artist ->
           print l (sprintf "    %s" artist.Artist.name) ; l + 1
         )
       in
-      let x = result.albums in
-      print line (sprintf " %c %d albums" (item x.folded) (List.length x.values)) ;
       let line =
-        if x.folded then line + 1 else
-        List.fold x.values ~init:(line + 1) ~f:(fun l album ->
+        foobar ~line (sprintf " %c %d albums") result.albums ~f:(fun l album ->
           let authors =
             let l = List.map album.Album.artists ~f:(fun a -> a.Artist.name) in
             let str = String.concat ~sep:", " l in
@@ -53,11 +51,8 @@ let draw ctx state =
           l + 1
         )
       in
-      let x = result.tracks in
-      print line (sprintf " %c %d tracks" (item x.folded) (List.length x.values));
       let line =
-        if x.folded then line + 1 else
-        List.fold x.values ~init:(line + 1) ~f:(fun l track ->
+        foobar ~line (sprintf " %c %d tracks") result.tracks ~f:(fun l track ->
           let infos =
             let l = List.map track.Track.artists ~f:(fun a -> a.Artist.name) in
             let str =
