@@ -113,22 +113,23 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
   | `Enter | `Space ->
     let toggled = ref false in
     let open Types in
+    let foobar ~f l x =
+      if !toggled then
+        return l
+      else if l = line then (
+        toggled := true ;
+        Foldable.toogle x ;
+        return l
+      ) else if x.Foldable.folded then
+        return (l + 1)
+      else
+        Lwt_list.fold_left_s f (l + 1) x.Foldable.values
+    in
     lwt _ =
       let fold_result l result =
         let open SearchResult in
         let l = l + 1 in
-        let l =
-          if !toggled then
-            l
-          else if l = line then (
-            toggled := true ;
-            Foldable.toogle result.artists ;
-            l
-          ) else if result.artists.Foldable.folded then
-            l + 1
-          else
-            List.fold result.artists.Foldable.values ~init:(l + 1) ~f:(fun l _artist -> l + 1)
-        in
+        lwt l = foobar l result.artists ~f:(fun l _ -> return (l + 1)) in
         lwt l =
           let album_fun l album =
             if l <> line then return (l + 1) else
@@ -143,16 +144,7 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
             in
             raise_lwt (Transition trans)
           in
-          if !toggled then
-            return l
-          else if l = line then (
-            toggled := true ;
-            Foldable.toogle result.albums ;
-            return l
-          ) else if result.albums.Foldable.folded then
-            return (l + 1)
-          else
-            Lwt_list.fold_left_s album_fun (l + 1) result.albums.Foldable.values
+          foobar l result.albums ~f:album_fun
         in
         lwt l =
           let track_fun l track =
@@ -175,17 +167,7 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
             in
             raise_lwt (Transition (Error msg))
           in
-          if !toggled then
-            return l
-          else
-          if l = line then (
-            toggled := true ;
-            Foldable.toogle result.tracks ;
-            return l
-          ) else if result.tracks.Foldable.folded then
-            return (l + 1)
-          else
-            Lwt_list.fold_left_s track_fun (l + 1) result.tracks.Foldable.values
+          foobar l result.tracks ~f:track_fun
         in
         return (l + 1)
       in
