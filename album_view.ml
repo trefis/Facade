@@ -7,7 +7,7 @@ let draw ctx state =
   let align = LTerm_geom.H_align_right in
   let bold_style = LTerm_style.({ none with bold = Some true }) in
   let style ?default row =
-    if row <> state.View.curr_line then None else
+    if row <> state.View.curr_line then default else
     Some LTerm_style.({ bold_style with foreground = Some lblue })
   in
   let print row ?(align = LTerm_geom.H_align_left) str =

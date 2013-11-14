@@ -25,22 +25,23 @@ let draw ctx state =
   ignore begin
     List.fold state.View.results ~init:0 ~f:(fun line result  ->
       let open SearchResult in
+      let open Foldable in
       let align = LTerm_geom.H_align_right in
       print line (sprintf " Source : %s" result.source) ;
       let line = line + 1 in
-      let l = result.artists in
-      print line (sprintf " %c %d artists" (item result.folded_art) (List.length l)) ;
+      let x = result.artists in
+      print line (sprintf " %c %d artists" (item x.folded) (List.length x.values)) ;
       let line =
-        if result.folded_art then line + 1 else
-        List.fold l ~init:(line + 1) ~f:(fun l artist ->
+        if x.folded then line + 1 else
+        List.fold x.values ~init:(line + 1) ~f:(fun l artist ->
           print l (sprintf "    %s" artist.Artist.name) ; l + 1
         )
       in
-      let l = result.albums in
-      print line (sprintf " %c %d albums" (item result.folded_alb) (List.length l)) ;
+      let x = result.albums in
+      print line (sprintf " %c %d albums" (item x.folded) (List.length x.values)) ;
       let line =
-        if result.folded_alb then line + 1 else
-        List.fold l ~init:(line + 1) ~f:(fun l album ->
+        if x.folded then line + 1 else
+        List.fold x.values ~init:(line + 1) ~f:(fun l album ->
           let authors =
             let l = List.map album.Album.artists ~f:(fun a -> a.Artist.name) in
             let str = String.concat ~sep:", " l in
@@ -52,11 +53,11 @@ let draw ctx state =
           l + 1
         )
       in
-      let l = result.tracks in
-      print line (sprintf " %c %d tracks" (item result.folded_tra) (List.length l)) ;
+      let x = result.tracks in
+      print line (sprintf " %c %d tracks" (item x.folded) (List.length x.values));
       let line =
-        if result.folded_tra then line + 1 else
-        List.fold l ~init:(line + 1) ~f:(fun l track ->
+        if x.folded then line + 1 else
+        List.fold x.values ~init:(line + 1) ~f:(fun l track ->
           let infos =
             let l = List.map track.Track.artists ~f:(fun a -> a.Artist.name) in
             let str =
@@ -86,9 +87,10 @@ let to_handled_keys = function
 let nb_lines =
   List.fold ~init:0 ~f:(fun nb result ->
     let open SearchResult in
-    let arts = if result.folded_art then 0 else List.length result.artists in
-    let albs = if result.folded_alb then 0 else List.length result.albums in
-    let tras = if result.folded_tra then 0 else List.length result.tracks in
+    let get_nb x = if x.Foldable.folded then 0 else List.length x.Foldable.values in
+    let arts = get_nb result.artists in
+    let albs = get_nb result.albums in
+    let tras = get_nb result.tracks in
     nb + 4 + arts + albs + tras
   )
 
@@ -116,17 +118,16 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
         let open SearchResult in
         let l = l + 1 in
         let l =
-          let lst = result.artists in
           if !toggled then
             l
           else if l = line then (
             toggled := true ;
-            result.folded_art <- not result.folded_art ;
+            Foldable.toogle result.artists ;
             l
-          ) else if result.folded_art then
+          ) else if result.artists.Foldable.folded then
             l + 1
           else
-            List.fold lst ~init:(l + 1) ~f:(fun l _artist -> l + 1)
+            List.fold result.artists.Foldable.values ~init:(l + 1) ~f:(fun l _artist -> l + 1)
         in
         lwt l =
           let album_fun l album =
@@ -142,17 +143,16 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
             in
             raise_lwt (Transition trans)
           in
-          let lst = result.albums in
           if !toggled then
             return l
           else if l = line then (
             toggled := true ;
-            result.folded_alb <- not result.folded_alb ;
+            Foldable.toogle result.albums ;
             return l
-          ) else if result.folded_alb then
+          ) else if result.albums.Foldable.folded then
             return (l + 1)
           else
-            Lwt_list.fold_left_s album_fun (l + 1) lst
+            Lwt_list.fold_left_s album_fun (l + 1) result.albums.Foldable.values
         in
         lwt l =
           let track_fun l track =
@@ -175,18 +175,17 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
             in
             raise_lwt (Transition (Error msg))
           in
-          let lst = result.tracks in
           if !toggled then
             return l
           else
           if l = line then (
             toggled := true ;
-            result.folded_tra <- not result.folded_tra ;
+            Foldable.toogle result.tracks ;
             return l
-          ) else if result.folded_tra then
+          ) else if result.tracks.Foldable.folded then
             return (l + 1)
           else
-            Lwt_list.fold_left_s track_fun (l + 1) lst
+            Lwt_list.fold_left_s track_fun (l + 1) result.tracks.Foldable.values
         in
         return (l + 1)
       in

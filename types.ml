@@ -10,6 +10,15 @@ let to_string' = function
   | `Null -> ""
   | s -> J.Util.to_string s
 
+module Foldable = struct
+  type 'a t = {
+    values : 'a list ;
+    mutable folded : bool ;
+  }
+
+  let toogle x = x.folded <- not x.folded
+end
+
 module Artist = struct
   type t = { uri : string ; name : string }
 
@@ -48,12 +57,9 @@ end
 module SearchResult = struct
   type t = {
     source  : string ;
-    artists : Artist.t list ;
-    mutable folded_art : bool ;
-    albums  : Album.t list ;
-    mutable folded_alb : bool ;
-    tracks  : Track.t list ;
-    mutable folded_tra : bool ;
+    artists : Artist.t Foldable.t ;
+    albums  : Album.t Foldable.t ;
+    tracks  : Track.t Foldable.t ;
   }
 
   let from_json j =
@@ -63,15 +69,11 @@ module SearchResult = struct
       | src :: _ -> src
       | _ -> assert false
     in
-    let artists = J.Util.(member "artists" j |> convert_each' Artist.from_json) in
-    let albums = J.Util.(member "albums" j |> convert_each' Album.from_json) in
-    let tracks = J.Util.(member "tracks" j |> convert_each' Track.from_json) in
-    { 
-      source ; artists ; albums ; tracks ;
-      folded_art = true ;
-      folded_alb = true ;
-      folded_tra = true ;
-    }
+    let mk values = { Foldable. values ; folded = true } in
+    let artists = mk J.Util.(member "artists" j |> convert_each' Artist.from_json) in
+    let albums = mk J.Util.(member "albums" j |> convert_each' Album.from_json) in
+    let tracks = mk J.Util.(member "tracks" j |> convert_each' Track.from_json) in
+    { source ; artists ; albums ; tracks  }
 end
 
 module View = struct
