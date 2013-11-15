@@ -71,12 +71,18 @@ let draw ctx state =
     )
   end
 
-let to_handled_keys = function
-  | LTerm_key.Up -> `Up
-  | LTerm_key.Down -> `Down
-  | LTerm_key.Enter -> `Enter
-  | LTerm_key.Char uchar when CamomileLibrary.UChar.char_of uchar = ' ' ->
-    `Space
+let to_handled_keys =
+  let open LTerm_key in
+  function
+  | Up -> `Up
+  | Down -> `Down
+  | Enter -> `Enter
+  | Char uchar ->
+    let c = CamomileLibrary.UChar.char_of uchar in
+    if c = ' ' then `Space else
+    if c = 'j' then `Down else
+    if c = 'k' then `Up else
+      `NotHandled
   | _ -> `NotHandled
 
 let nb_lines =
