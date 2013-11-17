@@ -59,16 +59,18 @@ let action ~key uri name =
 
 let handle env ~key ({ View. curr_line ; songs } as state) =
   let key = to_handled_keys (LTerm_key.code key) in
+  let incr_line () =
+    let line = min (List.length songs) (curr_line + 1) in
+    state.View.curr_line <- line
+  in
   match key with
   | `Up ->
     let line = max 0 (curr_line - 1) in
     state.View.curr_line <- line ;
     return ()
-  | `Down ->
-    let line = min (List.length songs) (curr_line + 1) in
-    state.View.curr_line <- line ;
-    return ()
+  | `Down -> return (incr_line ())
   | `Enter | `Space ->
+    incr_line () ;
     if curr_line = 0 then action key state.View.uri state.View.name else
     let f i track =
       if i <> curr_line then return (i + 1) else
