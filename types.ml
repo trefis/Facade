@@ -91,10 +91,18 @@ module View = struct
     mutable curr_line : int ;
   }
 
+  type artist_view_state = {
+    name  : string ;
+    uri   : string ;
+    albums: Album.t list ;
+    mutable curr_line : int ;
+  }
+
   type t =
     | Main of CamomileLibrary.UChar.t Zipper.t
     | SR of sr_state
     | Album of album_view_state
+    | Artist of artist_view_state
 end
 
 exception Transition of (View.t, string) Result.t

@@ -130,7 +130,22 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
       let fold_result l result =
         let open SearchResult in
         let l = l + 1 in
-        lwt l = foobar l result.artists ~f:(fun l _ -> return (l + 1)) in
+        lwt l = 
+          let artist_fun l artist =
+            if l <> line then return (l + 1) else
+            let name = artist.Artist.name in
+            let uri = artist.Artist.uri in
+            lwt trans =
+              Network.get_artist uri name
+              >|= function
+              | Error msg -> Error msg
+              | Ok albums ->
+                Ok View.(Artist { name ; uri ; albums ; curr_line = 0 })
+            in
+            raise_lwt (Transition trans)
+          in
+          foobar l result.artists ~f:artist_fun
+        in
         lwt l =
           let album_fun l album =
             if l <> line then return (l + 1) else

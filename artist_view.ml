@@ -3,7 +3,7 @@ open Lwt
 
 open Types
 
-let draw ctx (state : View.album_view_state) =
+let draw ctx state =
   let align = LTerm_geom.H_align_right in
   let bold_style = LTerm_style.({ none with bold = Some true }) in
   let style ?default row =
@@ -15,15 +15,15 @@ let draw ctx (state : View.album_view_state) =
   in
   LTerm_draw.draw_string_aligned ctx 1 LTerm_geom.H_align_center
     ?style:(style ~default:bold_style 0) state.View.name ;
-  List.iteri state.View.songs ~f:(fun line item ->
+  List.iteri state.View.albums ~f:(fun line item ->
     let line = line + 1 in
     let infos =
-      let l = List.map item.Track.artists ~f:(fun a -> a.Artist.name) in
+      let l = List.map item.Album.artists ~f:(fun a -> a.Artist.name) in
       let str = String.concat ~sep:", " l in
       if String.length str <= 50 then str else
         sprintf "%s..." (String.prefix str 47)
     in
-    print line (sprintf "    %s" item.Track.name) ;
+    print line (sprintf "    %s" item.Album.name) ;
     print line ~align (sprintf "%s    " infos) ;
   )
 
@@ -57,10 +57,10 @@ let action ~key uri name =
   in
   raise_lwt (Transition (Error msg))
 
-let handle env ~key ({ View. curr_line ; songs } as state) =
+let handle env ~key ({ View. curr_line ; albums } as state) =
   let key = to_handled_keys (LTerm_key.code key) in
   let incr_line () =
-    let line = min (List.length songs) (curr_line + 1) in
+    let line = min (List.length albums) (curr_line + 1) in
     state.View.curr_line <- line
   in
   match key with
@@ -70,13 +70,21 @@ let handle env ~key ({ View. curr_line ; songs } as state) =
     return ()
   | `Down -> return (incr_line ())
   | `Enter | `Space ->
-    incr_line () ;
-    if curr_line = 0 then action key state.View.uri state.View.name else
-    let f i track =
+    if curr_line = 0 then return () else
+    let f i album =
       if i <> curr_line then return (i + 1) else
-        action key track.Track.uri track.Track.name
+      let name = album.Album.name in
+      let uri = album.Album.uri in
+      lwt trans =
+        Network.get_album uri name
+        >|= function
+        | Error msg -> Error msg
+        | Ok songs ->
+          Ok View.(Album { name ; uri ; songs ; curr_line = 0 })
+      in
+      raise_lwt (Transition trans)
     in
-    lwt _ = Lwt_list.fold_left_s f 1 songs in
+    lwt _ = Lwt_list.fold_left_s f 1 albums in
     return ()
   | _ ->
     return ()

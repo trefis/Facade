@@ -104,3 +104,28 @@ let get_album ?(dest=localhost) uri name =
     )
   with Unix.Unix_error _ ->
     return (Error "server not reachable")
+
+let get_artist ?(dest=localhost) uri name =
+  try_lwt
+    Tcp_client.with_connection dest (fun (ic, oc) ->
+      let query =
+        mk_query "get_artist" (`Assoc [
+          ("uri", `String uri) ;
+          ("name", `String name) ;
+        ])
+      in
+      lwt () = Lwt_io.write_line oc query in
+      lwt str = Lwt_io.read_line ic in
+      let json = J.from_string str in
+      match J.Util.(index 0 json |> to_string) with
+      | "ok" ->
+	let answer = J.Util.index 1 json in
+	return (Ok (J.Util.convert_each Types.Album.from_json answer))
+      | "error" ->
+	let err = J.Util.(index 1 json |> to_string) in
+	return (Error err)
+      | msg ->
+	return (Error (sprintf "unknown answer kind '%s'" msg))
+    )
+  with Unix.Unix_error _ ->
+    return (Error "server not reachable")
