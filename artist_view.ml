@@ -31,14 +31,16 @@ let draw ctx state =
 let to_handled_keys =
   let open LTerm_key in
   function
-  | Up -> `Up
-  | Down -> `Down
+  | Up -> `Up 1
+  | Prev_page -> `Up 10
+  | Down -> `Down 1
+  | Next_page -> `Down 10
   | Enter -> `Enter
   | Char uchar ->
     let c = CamomileLibrary.UChar.char_of uchar in
     if c = ' ' then `Space else
-    if c = 'j' then `Down else
-    if c = 'k' then `Up else
+    if c = 'j' then `Down 1 else
+    if c = 'k' then `Up 1 else
       `NotHandled
   | _ -> `NotHandled
 
@@ -59,16 +61,16 @@ let action ~key uri name =
 
 let handle env ~key ({ View. curr_line ; albums } as state) =
   let key = to_handled_keys (LTerm_key.code key) in
-  let incr_line () =
-    let line = min (List.length albums) (curr_line + 1) in
+  let incr_line ?(nb=1) () =
+    let line = min (List.length albums) (curr_line + nb) in
     state.View.curr_line <- line
   in
   match key with
-  | `Up ->
-    let line = max 0 (curr_line - 1) in
+  | `Up nb ->
+    let line = max 0 (curr_line - nb) in
     state.View.curr_line <- line ;
     return ()
-  | `Down -> return (incr_line ())
+  | `Down nb -> return (incr_line ~nb ())
   | `Enter | `Space ->
     if curr_line = 0 then return () else
     let f i album =

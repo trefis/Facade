@@ -74,14 +74,16 @@ let draw ctx state =
 let to_handled_keys =
   let open LTerm_key in
   function
-  | Up -> `Up
-  | Down -> `Down
+  | Up -> `Up 1
+  | Prev_page -> `Up 10
+  | Down -> `Down 1
+  | Next_page -> `Down 10
   | Enter -> `Enter
   | Char uchar ->
     let c = CamomileLibrary.UChar.char_of uchar in
     if c = ' ' then `Space else
-    if c = 'j' then `Down else
-    if c = 'k' then `Up else
+    if c = 'j' then `Down 1 else
+    if c = 'k' then `Up 1 else
       `NotHandled
   | _ -> `NotHandled
 
@@ -99,17 +101,17 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
   let key = to_handled_keys (LTerm_key.code key) in
   let (min_r, max_r) = state.View.screen_portion in
   match key with
-  | `Up ->
-    let line = max 0 (line - 1) in
+  | `Up nb ->
+    let line = max 0 (line - nb) in
     state.View.cursor_line <- line ;
     if min_r > line then
-      state.View.screen_portion <- (min_r - 1, max_r - 1) ;
+      state.View.screen_portion <- (min_r - nb, max_r - nb) ;
     return ()
-  | `Down ->
-    let line = min (nb_lines state.View.results) (line + 1) in
+  | `Down nb ->
+    let line = min (nb_lines state.View.results) (line + nb) in
     state.View.cursor_line <- line ;
     if max_r < line then
-      state.View.screen_portion <- (min_r + 1, max_r + 1) ;
+      state.View.screen_portion <- (min_r + nb, max_r + nb) ;
     return ()
   | `Enter | `Space ->
     let toggled = ref false in
