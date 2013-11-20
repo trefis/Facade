@@ -3,19 +3,19 @@ open Lwt
 
 open Types
 
-let draw ctx (state : View.album_view_state) =
+let draw ctx state =
   let align = LTerm_geom.H_align_right in
   let bold_style = LTerm_style.({ none with bold = Some true }) in
   let style ?default row =
-    if row <> state.View.curr_line then default else
+    if row <> state.View.State.curr_line then default else
     Some LTerm_style.({ bold_style with foreground = Some lblue })
   in
   let print row ?(align = LTerm_geom.H_align_left) str =
     LTerm_draw.draw_string_aligned ctx (3 + row) align ?style:(style row) str
   in
   LTerm_draw.draw_string_aligned ctx 1 LTerm_geom.H_align_center
-    ?style:(style ~default:bold_style 0) state.View.name ;
-  List.iteri state.View.songs ~f:(fun line item ->
+    ?style:(style ~default:bold_style 0) state.View.State.name ;
+  List.iteri state.View.State.content ~f:(fun line item ->
     let line = line + 1 in
     let infos =
       let l = List.map item.Track.artists ~f:(fun a -> a.Artist.name) in
@@ -59,26 +59,26 @@ let action ~key uri name =
   in
   raise_lwt (Transition (Error msg))
 
-let handle env ~key ({ View. curr_line ; songs } as state) =
+let handle env ~key ({ View.State. curr_line ; content } as state) =
   let key = to_handled_keys (LTerm_key.code key) in
   let incr_line ?(nb=1) () =
-    let line = min (List.length songs) (curr_line + nb) in
-    state.View.curr_line <- line
+    let line = min (List.length content) (curr_line + nb) in
+    state.View.State.curr_line <- line
   in
   match key with
   | `Up nb ->
     let line = max 0 (curr_line - nb) in
-    state.View.curr_line <- line ;
+    state.View.State.curr_line <- line ;
     return ()
   | `Down nb -> return (incr_line ~nb ())
   | `Enter | `Space ->
     incr_line () ;
-    if curr_line = 0 then action key state.View.uri state.View.name else
+    if curr_line = 0 then action key state.View.State.uri state.View.State.name else
     let f i track =
       if i <> curr_line then return (i + 1) else
         action key track.Track.uri track.Track.name
     in
-    lwt _ = Lwt_list.fold_left_s f 1 songs in
+    lwt _ = Lwt_list.fold_left_s f 1 content in
     return ()
   | _ ->
     return ()

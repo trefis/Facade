@@ -141,8 +141,8 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
               Network.get_artist uri name
               >|= function
               | Error msg -> Error msg
-              | Ok albums ->
-                Ok View.(Artist { name ; uri ; albums ; curr_line = 0 })
+              | Ok content ->
+                Ok View.(Artist { State. name ; uri ; content ; curr_line = 0 })
             in
             raise_lwt (Transition trans)
           in
@@ -157,8 +157,8 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
               Network.get_album uri name
               >|= function
               | Error msg -> Error msg
-              | Ok songs ->
-                Ok View.(Album { name ; uri ; songs ; curr_line = 0 })
+              | Ok content ->
+                Ok View.(Album { State. name ; uri ; content ; curr_line = 0 })
             in
             raise_lwt (Transition trans)
           in

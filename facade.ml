@@ -10,8 +10,8 @@ let hist_string =
     match elt with
     | Main _ -> sprintf "%s %s search" acc separator
     | SR state -> sprintf "%s %s %s" acc separator state.request
-    | Artist state -> sprintf "%s %s %s" acc separator state.name
-    | Album state -> sprintf "%s %s %s" acc separator state.name
+    | Artist state -> sprintf "%s %s %s" acc separator state.State.name
+    | Album state -> sprintf "%s %s %s" acc separator state.State.name
   )
 
 let subcontext ctx ~between =
