@@ -27,23 +27,6 @@ let draw ctx state =
     print line ~align (sprintf "%s    " infos) ;
   )
 
-
-let to_handled_keys =
-  let open LTerm_key in
-  function
-  | Up -> `Up 1
-  | Prev_page -> `Up 10
-  | Down -> `Down 1
-  | Next_page -> `Down 10
-  | Enter -> `Enter
-  | Char uchar ->
-    let c = CamomileLibrary.UChar.char_of uchar in
-    if c = ' ' then `Space else
-    if c = 'j' then `Down 1 else
-    if c = 'k' then `Up 1 else
-      `NotHandled
-  | _ -> `NotHandled
-
 let action ~key uri name =
   let result, msg =
     match key with
@@ -60,7 +43,7 @@ let action ~key uri name =
   raise_lwt (Transition (Error msg))
 
 let handle env ~key ({ View.State. curr_line ; content } as state) =
-  let key = to_handled_keys (LTerm_key.code key) in
+  let key = Misc.to_handled_keys (LTerm_key.code key) in
   let incr_line ?(nb=1) () =
     let line = min (List.length content) (curr_line + nb) in
     state.View.State.curr_line <- line
