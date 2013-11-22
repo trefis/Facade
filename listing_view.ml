@@ -17,7 +17,7 @@ let to_handled_keys =
       `NotHandled
   | _ -> `NotHandled
 
-class ['a] t name (content : 'a list) get_infos action = object
+class ['a] t name (content : 'a list) get_infos main_action action = object
   method name = name
   val mutable curr_line = 0
 
@@ -57,7 +57,7 @@ class ['a] t name (content : 'a list) get_infos action = object
       return ()
     | `Down nb -> return (incr_line ~nb ())
     | `Enter | `Space as k ->
-      if curr_line = 0 then return () else
+      if curr_line = 0 then main_action k else
       let f i entry =
         if i <> curr_line then return (i + 1) else
         action k entry

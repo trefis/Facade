@@ -5,15 +5,14 @@ open Types
 let artists_to_str lst =
   List.map lst ~f:(fun a -> a.Artist.name) |> String.concat ~sep:", "
 
-let new_album_view name content =
+let new_album_view uri name content =
   let get_infos { Track. name ; artists ; _ } = name, artists_to_str artists in
-  let action key { Track. uri ; name ; _ } =
+  let do_act key msg uri name =
     let result, msg =
       match key with
-      | `Enter -> Network.play uri, sprintf "Playing '%s'" name
-      | `Space -> Network.queue uri, sprintf "Added '%s' to playlist" name
+      | `Enter -> Network.play uri, sprintf "Playing %s '%s'" msg name
+      | `Space -> Network.queue uri, sprintf "Added %s '%s' to playlist" msg name
     in
-    let open Lwt in
     lwt msg =
       result
       >|= function
@@ -22,7 +21,9 @@ let new_album_view name content =
     in
     raise_lwt (Transition (Error msg))
   in
-  new Listing_view.t name content get_infos action
+  let main_action key = do_act key "album" uri name in
+  let action key { Track. uri ; name ; _ } = do_act key "track" uri name in
+  new Listing_view.t name content get_infos main_action action
 
 let new_artist_view name content =
   let get_infos { Album. name ; artists ; _ } = name, artists_to_str artists in
@@ -32,11 +33,11 @@ let new_artist_view name content =
       Network.get_album uri name
       >|= function
       | Error msg -> Error msg
-      | Ok content -> Ok View.(Album (new_album_view name content))
+      | Ok content -> Ok View.(Album (new_album_view uri name content))
     in
     raise_lwt (Transition view)
   in
-  new Listing_view.t name content get_infos action
+  new Listing_view.t name content get_infos (fun _ -> return ()) action
 
 let draw ctx state =
   let line = state.View.cursor_line in
@@ -176,7 +177,7 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
               Network.get_album uri name
               >|= function
               | Error msg -> Error msg
-              | Ok content -> Ok View.(Album (new_album_view name content))
+              | Ok content -> Ok View.(Album (new_album_view uri name content))
             in
             raise_lwt (Transition trans)
           in
