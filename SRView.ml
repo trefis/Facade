@@ -2,6 +2,42 @@ open Core.Std
 open Lwt
 open Types
 
+let artists_to_str lst =
+  List.map lst ~f:(fun a -> a.Artist.name) |> String.concat ~sep:", "
+
+let new_album_view name content =
+  let get_infos { Track. name ; artists ; _ } = name, artists_to_str artists in
+  let action key { Track. uri ; name ; _ } =
+    let result, msg =
+      match key with
+      | `Enter -> Network.play uri, sprintf "Playing '%s'" name
+      | `Space -> Network.queue uri, sprintf "Added '%s' to playlist" name
+    in
+    let open Lwt in
+    lwt msg =
+      result
+      >|= function
+      | Ok () -> msg
+      | Error msg -> msg
+    in
+    raise_lwt (Transition (Error msg))
+  in
+  new Listing_view.t name content get_infos action
+
+let new_artist_view name content =
+  let get_infos { Album. name ; artists ; _ } = name, artists_to_str artists in
+  let action _key { Album. uri ; name ; _ } =
+    let open Lwt in
+    lwt view =
+      Network.get_album uri name
+      >|= function
+      | Error msg -> Error msg
+      | Ok content -> Ok View.(Album (new_album_view name content))
+    in
+    raise_lwt (Transition view)
+  in
+  new Listing_view.t name content get_infos action
+
 let draw ctx state =
   let line = state.View.cursor_line in
   if state.View.screen_portion = (0,0) then (
@@ -82,7 +118,7 @@ let nb_lines =
   )
 
 let handle env ~key ({ View. cursor_line = line ; _ } as state) =
-  let key = Misc.to_handled_keys (LTerm_key.code key) in
+  let key = Listing_view.to_handled_keys (LTerm_key.code key) in
   let (min_r, max_r) = state.View.screen_portion in
   match key with
   | `Up nb ->
@@ -125,8 +161,7 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
               Network.get_artist uri name
               >|= function
               | Error msg -> Error msg
-              | Ok content ->
-                Ok View.(Artist { State. name ; uri ; content ; curr_line = 0 })
+              | Ok content -> Ok View.(Artist (new_artist_view name content))
             in
             raise_lwt (Transition trans)
           in
@@ -141,8 +176,7 @@ let handle env ~key ({ View. cursor_line = line ; _ } as state) =
               Network.get_album uri name
               >|= function
               | Error msg -> Error msg
-              | Ok content ->
-                Ok View.(Album { State. name ; uri ; content ; curr_line = 0 })
+              | Ok content -> Ok View.(Album (new_album_view name content))
             in
             raise_lwt (Transition trans)
           in

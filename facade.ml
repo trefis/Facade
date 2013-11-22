@@ -10,8 +10,8 @@ let hist_string =
     match elt with
     | Main _ -> sprintf "%s %s search" acc separator
     | SR state -> sprintf "%s %s %s" acc separator state.request
-    | Artist state -> sprintf "%s %s %s" acc separator state.State.name
-    | Album state -> sprintf "%s %s %s" acc separator state.State.name
+    | Artist state -> sprintf "%s %s %s" acc separator state#name
+    | Album state -> sprintf "%s %s %s" acc separator state#name
   )
 
 let subcontext ctx ~between =
@@ -35,8 +35,8 @@ let draw_fun (env, err_opt) ui matrix =
   begin match Zipper.current !env with
   | Main str -> Main.draw main_view str
   | SR state -> SRView.draw main_view state
-  | Artist state -> Artist_view.draw main_view state
-  | Album state -> Album_view.draw main_view state
+  | Artist state
+  | Album state -> state#draw main_view
   end ;
   match !err_opt with
   | None -> ()
@@ -50,8 +50,8 @@ let handle env err_opt ~key =
     begin match Zipper.current !env with
     | View.Main str -> Main.handle env ~key str
     | View.SR state -> SRView.handle env ~key state
-    | View.Artist st -> Artist_view.handle env ~key st
-    | View.Album st -> Album_view.handle env ~key st
+    | View.Artist state
+    | View.Album state -> state#handle ~key
     end
   with
   | Transition (Ok view) ->

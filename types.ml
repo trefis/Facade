@@ -84,20 +84,12 @@ module View = struct
     mutable screen_portion : int * int ;
   }
 
-  module State = struct
-    type 'a t = {
-      name    : string ;
-      uri     : string ;
-      content : 'a list ;
-      mutable curr_line : int ;
-    }
-  end
-
   type t =
     | Main of CamomileLibrary.UChar.t Zipper.t
     | SR of sr_state
-    | Album of Track.t State.t
-    | Artist of Album.t State.t
+    | Album of Track.t Listing_view.t
+    | Artist of Album.t Listing_view.t
+
 end
 
 exception Transition of (View.t, string) Result.t
