@@ -2,7 +2,7 @@ open Core.Std
 open Lwt
 open CamomileLibrary
 
-open Types
+open View
 
 let get_string (z : UChar.t Zipper.t) =
   let l = List.map (Zipper.to_list z) ~f:UPervasives.escaped_uchar in
@@ -45,9 +45,7 @@ let handle env ~key str =
     | Enter ->
       let request = get_string str in
       lwt res = Network.search request in
-      let f results =
-        View.(SR { request ; results ; cursor_line = 0 ; screen_portion = 0,0 })
-      in
+      let f results = SR (SearchResult.make_state request results) in
       let res = Result.map res ~f in
       raise_lwt (Transition res)
     | Backspace  -> return (Zipper.delete str `before)
@@ -58,5 +56,5 @@ let handle env ~key str =
     | _ -> return str
   in
   if not (phys_equal str str') then
-    env := Zipper.set_current !env (View.Main str') ;
+    env := Zipper.set_current !env (Main str') ;
   return_unit

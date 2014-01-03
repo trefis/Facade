@@ -1,7 +1,6 @@
 open Core.Std
 open Lwt
 open CamomileLibrary
-open Types
 
 let hist_string =
   Zipper.fold ~init:"" ~f:(fun is_current acc elt ->
@@ -9,7 +8,7 @@ let hist_string =
     let open View in
     match elt with
     | Main _ -> sprintf "%s %s search" acc separator
-    | SR state -> sprintf "%s %s %s" acc separator state.request
+    | SR state -> sprintf "%s %s %s" acc separator state.SearchResult.request
     | Artist state -> sprintf "%s %s %s" acc separator state#name
     | Album state -> sprintf "%s %s %s" acc separator state#name
   )
@@ -54,10 +53,10 @@ let handle env err_opt ~key =
     | View.Album state -> state#handle ~key
     end
   with
-  | Transition (Ok view) ->
+  | View.Transition (Ok view) ->
     env := Zipper.insert (Zipper.drop_tail !env) view `after ;
     return_unit
-  | Transition (Error msg) ->
+  | View.Transition (Error msg) ->
     err_opt := Some (msg, Time.now ()) ;
     return_unit
 
@@ -91,7 +90,7 @@ let rec refresher ui =
   refresher ui
   
 let _lwt_unit =
-  let initial_env = ref Env.init in
+  let initial_env = ref View.Env.init in
   let initial_err = ref None in
   lwt term = Lazy.force LTerm.stdout in
   lwt ui   = LTerm_ui.create term (draw_fun (initial_env, initial_err)) in
