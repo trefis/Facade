@@ -3,6 +3,9 @@ open Lwt
 
 module J = Yojson.Basic
 
+type 'a or_error = ('a, string) Result.t t
+type uri = string
+
 let localhost = Lwt_unix.ADDR_INET (Caml.Unix.inet_addr_loopback, 8881)
 
 module Field = struct
@@ -20,7 +23,12 @@ let mk_query name json =
   let query = `List [ `String name ; json ] in
   J.to_string query
 
-let search ?(dest=localhost) ?(tag=`any) pattern =
+let search ?(dest=localhost) ?tag pattern =
+  let tag =
+    match tag with
+    | None -> `any
+    | Some t -> (t :> Field.with_extra)
+  in
   try_lwt
     Tcp_client.with_connection dest (fun (ic, oc) ->
       let query =
