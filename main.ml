@@ -44,7 +44,7 @@ let handle env ~key str =
     match LTerm_key.code key with
     | Enter ->
       let request = get_string str in
-      lwt res = Network.search request in
+      lwt res = Mopidy.search request in
       let f results = SR (SearchResult.make_state request results) in
       let res = Result.map res ~f in
       raise_lwt (Transition res)

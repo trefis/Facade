@@ -3,7 +3,7 @@ open Lwt
 
 let () =
   Lwt_main.run (
-    Network.search ~tag:`artist "eminem"
+    Mopidy.search ~tag:`artist "eminem"
     >>= function
     | Error e ->
       printf "Error: %s\n%!" e ;

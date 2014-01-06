@@ -1,7 +1,7 @@
 open Core.Std
 open Lwt
 
-open Network
+open Mopidy
 open View
 
 let artists_to_str lst =
@@ -12,8 +12,8 @@ let new_album_view uri name content =
   let do_act key msg uri name =
     let result, msg =
       match key with
-      | `Enter -> Network.play uri, sprintf "Playing %s '%s'" msg name
-      | `Space -> Network.queue uri, sprintf "Added %s '%s' to playlist" msg name
+      | `Enter -> Mopidy.play uri, sprintf "Playing %s '%s'" msg name
+      | `Space -> Mopidy.queue uri, sprintf "Added %s '%s' to playlist" msg name
     in
     lwt msg =
       result
@@ -32,7 +32,7 @@ let new_artist_view name content =
   let action _key { Album. uri ; name ; _ } =
     let open Lwt in
     lwt view =
-      Network.get_album uri name
+      Mopidy.get_album uri name
       >|= function
       | Error msg -> Error msg
       | Ok content -> Ok View.(Album (new_album_view uri name content))
@@ -159,7 +159,7 @@ let handle env ~key ({ SearchResult. cursor_line = line ; _ } as state) =
             let name = artist.Artist.name in
             let uri = artist.Artist.uri in
             lwt trans =
-              Network.get_artist uri name
+              Mopidy.get_artist uri name
               >|= function
               | Error msg -> Error msg
               | Ok content -> Ok View.(Artist (new_artist_view name content))
@@ -174,7 +174,7 @@ let handle env ~key ({ SearchResult. cursor_line = line ; _ } as state) =
             let name = album.Album.name in
             let uri = album.Album.uri in
             lwt trans =
-              Network.get_album uri name
+              Mopidy.get_album uri name
               >|= function
               | Error msg -> Error msg
               | Ok content -> Ok View.(Album (new_album_view uri name content))
@@ -189,10 +189,10 @@ let handle env ~key ({ SearchResult. cursor_line = line ; _ } as state) =
             let result, msg =
               match key with
               | `Enter ->
-                Network.play track.Track.uri,
+                Mopidy.play track.Track.uri,
                 sprintf "Playing '%s'" track.Track.name
               | (* `Space *) _ ->
-                Network.queue track.Track.uri,
+                Mopidy.queue track.Track.uri,
                 sprintf "Added '%s' to playlist" track.Track.name
             in
             state.SearchResult.cursor_line <- line + 1 ;

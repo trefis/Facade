@@ -12,14 +12,14 @@ end
 module SearchResult = struct
   type t = {
     source  : string ;
-    artists : Network.Artist.t Foldable.t ;
-    albums  : Network.Album.t Foldable.t ;
-    tracks  : Network.Track.t Foldable.t ;
+    artists : Mopidy.Artist.t Foldable.t ;
+    albums  : Mopidy.Album.t Foldable.t ;
+    tracks  : Mopidy.Track.t Foldable.t ;
   }
 
   let fold values = { Foldable. values ; folded = true }
 
-  let mk_foldable { Network.SearchResult. source; artists; albums; tracks } = {
+  let mk_foldable { Mopidy.SearchResult. source; artists; albums; tracks } = {
     source ;
     artists = fold artists ;
     albums = fold albums ;
@@ -44,8 +44,8 @@ end
 type t =
   | Main of CamomileLibrary.UChar.t Zipper.t
   | SR of SearchResult.state
-  | Album of Network.Track.t Listing_view.t
-  | Artist of Network.Album.t Listing_view.t
+  | Album of Mopidy.Track.t Listing_view.t
+  | Artist of Mopidy.Album.t Listing_view.t
 type kind = t
 
 exception Transition of (t, string) Result.t
